@@ -63,6 +63,8 @@ def scan_port(host: str, port: int, mode: str, transport: str) -> bool:
 		packet /= make_tcp_packet(port, mode)
 		response = sr1(packet, timeout=1, verbose=0)
 		match [mode, response]:
+			case [_, None]:
+				return False
 			case ["syn", response]:
 				return response.haslayer("TCP") and response.getlayer("TCP").flags == 18
 			case ["fin", None]:
