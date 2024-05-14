@@ -1,0 +1,39 @@
+#!/usr/bin/env nft -f
+# file: src/firewall/ntp.nft
+# author: nicolas fischer
+#
+# -----------------------------------
+# firewall mode: normal
+# device: ntp
+
+flush ruleset
+
+define NET_WWW = 10.2.0.0/24
+define NET_WSs = 10.1.0.0/24
+define NET_DMZ = 10.12.0.0/24
+
+table ip firewall {
+	chain input {
+		type filter hook input priority 0; policy drop;
+		ct state invalid counter packets 0 bytes 0 drop 
+	 	ct state { established, related } counter packets 0 bytes 0 accept 
+			
+		ip saddr $NET_WSs ip daddr $NET_DMZ counter packets 0 bytes 0 ct state new accept
+		ip saddr $NET_WWW ip daddr $NET_DMZ counter packets 0 bytes 0 ct state new accept 
+		
+		counter packets 0 bytes 0 drop
+	}
+	chain forward {
+		type filter hook forward priority 0; policy drop;
+	}
+	chain output {
+		type filter hook output priority 0; policy drop;
+		ct state invalid counter packets 0 bytes 0 drop 
+	 	ct state { established, related } counter packets 0 bytes 0 accept 
+		
+		ip saddr $NET_DMZ ip daddr $NET_WSs counter packets 0 bytes 0 accept
+		ip saddr $NET_DMZ ip daddr $NET_WWW counter packets 0 bytes 0 accept
+		
+		counter packets 0 bytes 0
+	}
+}
