@@ -9,5 +9,6 @@ pkgs.mkShellNoCC {
   packages = with pkgs; [
     inetutils
     go
+    nftables
   ];
 }
