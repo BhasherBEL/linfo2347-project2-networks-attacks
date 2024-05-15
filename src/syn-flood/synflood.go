@@ -103,9 +103,10 @@ func sendPacket(fd int, packet *TCP_IP, addr syscall.SockaddrInet4) {
 func main() {
 	target := flag.String("t", "", "Target IP address")
 	port := flag.Uint("p", 80, "Target port")
+	inter := flag.String("i", "", "Interface")
 	flag.Parse()
 
-	if *target == "" || *port == 0 || strings.Count(*target, ".") != 3 || *port > 65535 {
+	if *target == "" || *port == 0 || strings.Count(*target, ".") != 3 || *port > 65535 || *port < 1 || *inter == "" {
 		flag.PrintDefaults()
 		return
 	}
@@ -123,6 +124,10 @@ func main() {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
 	if err != nil {
 		panic("Failed to create socket: " + err.Error())
+	}
+	err = syscall.BindToDevice(fd, *inter)
+	if err != nil {
+		panic("Failed to bind to device: " + err.Error())
 	}
 
 	for {
