@@ -4,13 +4,20 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
+	//"time"
 )
 
+type SYNPacket struct {
+	Payload   []byte
+	TCPLength uint16
+	Adapter   string
+}
+
 type TCP_IP struct {
-	TCPLength     uint16
 	VersionIHL    byte
 	TOS           byte
 	TotalLen      uint16
@@ -30,11 +37,7 @@ type TCP_IP struct {
 	TCPChecksum   uint16
 	UrgentPointer uint16
 	Options       []byte
-	SYNPacket     struct {
-		Payload   []byte
-		TCPLength uint16
-		Adapter   string
-	}
+	SYNPacket     `key:"SYNPacket"`
 }
 
 func getPacket(dst []byte, dstPort uint16) *TCP_IP {
@@ -59,7 +62,6 @@ func getPacket(dst []byte, dstPort uint16) *TCP_IP {
 	}
 
 	rand.Read(packet.SRC)
-	rand.Read(packet.Sequence)
 
 	for packet.SrcPort < 1024 {
 		ps := make([]byte, 2)
@@ -67,8 +69,38 @@ func getPacket(dst []byte, dstPort uint16) *TCP_IP {
 		packet.SrcPort = (uint16)(ps[0])<<8 + (uint16)(ps[0])
 	}
 
-	packet.TotalLen = (uint16)(len(packet.SYNPacket.Payload) + 20)
+	t := reflect.TypeOf(packet).Elem()
+	v := reflect.ValueOf(packet).Elem()
 
+	packet.SYNPacket.Payload = make([]byte, 60)
+	var payloadIndex int = 0
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		alias, _ := field.Tag.Lookup("key")
+		if len(alias) < 1 {
+			key := v.Field(i).Interface()
+			keyType := reflect.TypeOf(key).Kind()
+			switch keyType {
+			case reflect.Uint8:
+				packet.SYNPacket.Payload[payloadIndex] = key.(uint8)
+				payloadIndex++
+			case reflect.Uint16:
+				packet.SYNPacket.Payload[payloadIndex] = (uint8)(key.(uint16) >> 8)
+				payloadIndex++
+				packet.SYNPacket.Payload[payloadIndex] = (uint8)(key.(uint16) & 0x00FF)
+				payloadIndex++
+			default:
+				for _, element := range key.([]uint8) {
+					packet.SYNPacket.Payload[payloadIndex] = element
+					payloadIndex++
+				}
+			}
+		}
+	}
+
+	packet.TCPLength = (uint16)(len(packet.SYNPacket.Payload) + 20)
+
+	packet.TotalLen = (uint16)(len(packet.SYNPacket.Payload) + 20)
 	packet.checksum()
 
 	return packet
@@ -134,6 +166,7 @@ func main() {
 		p := getPacket(dst, uint16(*port))
 		addr := syscall.SockaddrInet4{Port: int(p.DstPort), Addr: [4]byte(p.DST)}
 		sendPacket(fd, p, addr)
+		//time.Sleep(1 * time.Second)
 	}
 
 }
